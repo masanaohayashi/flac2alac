@@ -15,12 +15,10 @@ FLAC→ALAC GUI (SwiftUI, macOS)
 - `ffmpeg`（推奨）: `brew install ffmpeg`
 - もしくは `afconvert`（macOSに標準搭載）
 
-ビルド方法（Xcodeプロジェクト作成）
-1. Xcodeで「新規 > プロジェクト > App」を選択
-2. Interface: SwiftUI, Language: Swift, プラットフォーム: macOS を選択
-3. 作成されたテンプレートの `App` と `ContentView` を、本ディレクトリの `FLAC2ALACApp.swift` / `ContentView.swift` に置き換え
-4. 新規Swiftファイルとして `Converter.swift` を追加し、内容を貼り付け
-5. ビルド & 実行
+ビルド方法（同梱Xcodeプロジェクト）
+1. `macos-app/FLAC2ALAC.xcodeproj` をXcodeで開く
+2. ターゲット `FLAC2ALAC` を選び、SigningのTeamを自身のアカウントに設定
+3. 実行（⌘R）
 
 使い方
 - 入力: 「選択…」から `.flac` ファイルやディレクトリを複数選べます
@@ -35,4 +33,3 @@ FLAC→ALAC GUI (SwiftUI, macOS)
 注意
 - 可逆性検証には `ffmpeg` が必要です（afconvert変換でも検証自体はffmpegで実行）。
 - アートワークや特殊タグはファイルによっては移行されないことがあります。
-
