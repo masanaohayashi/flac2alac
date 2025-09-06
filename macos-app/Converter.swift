@@ -36,6 +36,7 @@ final class Converter {
         overwrite: Bool,
         verify: Bool,
         keepArtwork: Bool,
+        artworkURL: URL?,
         preferAfconvert: Bool,
         workers: Int,
         progress: @escaping (ConversionItem) -> Void
@@ -71,9 +72,17 @@ final class Converter {
                         }
                         try self.ensureParentDir(dst)
                         if kind == "ffmpeg" {
-                            try self.runFFmpeg(ffmpeg: tool, src: src, dst: dst, overwrite: overwrite, keepArtwork: keepArtwork)
+                            try self.runFFmpeg(ffmpeg: tool, src: src, dst: dst, overwrite: overwrite, keepArtwork: keepArtwork, artworkURL: artworkURL)
                         } else {
                             try self.runAfconvert(afconvert: tool, src: src, dst: dst, overwrite: overwrite)
+                            // afconvertではアートワーク埋め込みができないため、ffmpegがあれば追記処理
+                            if let cover = artworkURL, let ff = ffmpegForVerify {
+                                let tmp = dst.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".m4a")
+                                try self.injectArtworkWithFFmpeg(ffmpeg: ff, audio: dst, artwork: cover, out: tmp)
+                                // 置換
+                                try? FileManager.default.removeItem(at: dst)
+                                try FileManager.default.moveItem(at: tmp, to: dst)
+                            }
                         }
                         if verify, let ff = ffmpegForVerify {
                             let a = try self.computePCMMD5(ffmpeg: ff, url: src)
@@ -132,7 +141,7 @@ final class Converter {
 
     func computeOutputPath(src: URL, inplace: Bool, outputDir: URL?, inputRoot: URL?) -> URL {
         if inplace { return src.deletingPathExtension().appendingPathExtension("m4a") }
-        let base = outputDir ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("alac")
+        let base = outputDir ?? (FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Documents"))
         if let root = inputRoot, src.path.hasPrefix(root.path) {
             let rel = src.path.replacingOccurrences(of: root.path, with: "").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             let to = base.appendingPathComponent(rel).deletingPathExtension().appendingPathExtension("m4a")
@@ -151,16 +160,33 @@ final class Converter {
         return ds >= ss
     }
 
-    func runFFmpeg(ffmpeg: String, src: URL, dst: URL, overwrite: Bool, keepArtwork: Bool) throws {
+    func runFFmpeg(ffmpeg: String, src: URL, dst: URL, overwrite: Bool, keepArtwork: Bool, artworkURL: URL?) throws {
         var args = ["-hide_banner", "-loglevel", "error"]
         args += [overwrite ? "-y" : "-n"]
         args += ["-i", src.path]
-        if keepArtwork {
+        if let cover = artworkURL {
+            args += ["-i", cover.path]
+            args += ["-map", "0:a:0", "-c:a", "alac", "-map", "1:v:0", "-c:v:0", "copy", "-disposition:v:0", "attached_pic", "-map_metadata", "0", "-movflags", "use_metadata_tags"]
+        } else if keepArtwork {
             args += ["-map", "0:a:0", "-c:a", "alac", "-map", "0:v?", "-c:v", "copy", "-disposition:v:0", "attached_pic", "-map_metadata", "0", "-movflags", "use_metadata_tags"]
         } else {
             args += ["-map", "0:a:0", "-c:a", "alac", "-map_metadata", "0", "-movflags", "use_metadata_tags"]
         }
         args += [dst.path]
+        try runProcess(launchPath: ffmpeg, arguments: args)
+    }
+
+    func injectArtworkWithFFmpeg(ffmpeg: String, audio: URL, artwork: URL, out: URL) throws {
+        let args = [
+            "-hide_banner", "-loglevel", "error",
+            "-y",
+            "-i", audio.path,
+            "-i", artwork.path,
+            "-map", "0:a:0", "-c:a", "copy",
+            "-map", "1:v:0", "-c:v:0", "copy", "-disposition:v:0", "attached_pic",
+            "-map_metadata", "0", "-movflags", "use_metadata_tags",
+            out.path
+        ]
         try runProcess(launchPath: ffmpeg, arguments: args)
     }
 
@@ -246,4 +272,3 @@ final class Converter {
 private extension String {
     var prependedDot: String { self.hasPrefix(".") ? self : "." + self }
 }
-

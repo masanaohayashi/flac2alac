@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 final class AppViewModel: ObservableObject {
     @Published var inputPaths: [URL] = []
@@ -10,6 +11,7 @@ final class AppViewModel: ObservableObject {
     @Published var keepArtwork: Bool = true
     @Published var preferAfconvert: Bool = false
     @Published var workers: Int = max(1, ProcessInfo.processInfo.processorCount)
+    @Published var artworkURL: URL? = nil
 
     @Published var items: [ConversionItem] = []
     @Published var isRunning: Bool = false
@@ -39,6 +41,17 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+    func chooseArtwork() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowedFileTypes = ["jpg", "jpeg", "png"]
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK {
+            artworkURL = panel.url
+        }
+    }
+
     @MainActor
     func run() {
         guard !isRunning else { return }
@@ -60,6 +73,7 @@ final class AppViewModel: ObservableObject {
                     overwrite: overwrite,
                     verify: verify,
                     keepArtwork: keepArtwork,
+                    artworkURL: artworkURL,
                     preferAfconvert: preferAfconvert,
                     workers: workers,
                     progress: { [weak self] item in
@@ -100,6 +114,9 @@ struct ContentView: View {
                         .truncationMode(.middle)
                 }
                 .padding(6)
+                Text("ここに .flac ファイルやディレクトリをドラッグ＆ドロップしても追加できます")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
             }
 
             GroupBox(label: Text("出力")) {
@@ -108,11 +125,26 @@ struct ContentView: View {
                     HStack {
                         Button("出力先…") { viewModel.chooseOutputDir() }
                             .disabled(viewModel.inplace)
-                        Text((viewModel.outputDir?.path) ?? "未指定（デフォルトは ./alac）")
+                        Text((viewModel.outputDir?.path) ?? "未指定（デフォルトは ユーザーの書類フォルダ）")
                             .foregroundColor(viewModel.inplace ? .secondary : .primary)
                             .lineLimit(2)
                             .truncationMode(.middle)
                     }
+                }
+                .padding(6)
+            }
+
+            GroupBox(label: Text("アートワーク")) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Button("画像を選択…") { viewModel.chooseArtwork() }
+                        Text(viewModel.artworkURL?.lastPathComponent ?? "未選択（JPG/PNG。指定時は全てに適用）")
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    Text("ここに画像ファイルをドラッグ＆ドロップしても指定できます")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
                 .padding(6)
             }
@@ -165,7 +197,10 @@ struct ContentView: View {
 
         }
         .padding(12)
-        .frame(minWidth: 860, minHeight: 520)
+        .frame(minWidth: 860, minHeight: 560)
+        .onDrop(of: [UTType.fileURL, UTType.image], isTargeted: nil) { providers in
+            handleDrop(providers: providers)
+        }
     }
 
     private func color(for status: ConversionStatus) -> Color {
@@ -185,3 +220,44 @@ struct ContentView_Previews: PreviewProvider {
     }
 }
 
+extension ContentView {
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        var handled = false
+        let group = DispatchGroup()
+        for p in providers {
+            if p.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                group.enter()
+                _ = p.loadObject(ofClass: NSImage.self) { _, _ in
+                    // 画像本体からURLは取れないので、fileURLとしても試す
+                    group.leave()
+                }
+            }
+            if p.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                group.enter()
+                p.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (item, _) in
+                    defer { group.leave() }
+                    if let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) {
+                        handled = true
+                        if url.pathExtension.lowercased() == "flac" || isDirectory(url) {
+                            DispatchQueue.main.async {
+                                if !viewModel.inputPaths.contains(url) {
+                                    viewModel.inputPaths.append(url)
+                                }
+                            }
+                        } else if ["jpg","jpeg","png"].contains(url.pathExtension.lowercased()) {
+                            DispatchQueue.main.async {
+                                viewModel.artworkURL = url
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        group.wait()
+        return handled
+    }
+
+    private func isDirectory(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+    }
+}
