@@ -67,3 +67,7 @@ FLAC to ALAC (M4A) Converter CLI
 
 ライセンス
 - 本プロジェクトは MIT License です。詳細は `LICENSE` を参照してください。
+
+GUI（macOS）
+- `macos-app` ディレクトリに SwiftUI 製の簡易GUI版のソースを同梱しました。
+- Xcodeのテンプレートに差し替えるだけで動かせます。手順は `macos-app/README-macOS.md` を参照してください。
