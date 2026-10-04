@@ -105,100 +105,109 @@ struct ContentView: View {
     @ObservedObject var viewModel: AppViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            GroupBox(label: Text("入力")) {
-                HStack {
-                    Button("選択…") { viewModel.chooseInputs() }
-                    Text(viewModel.inputPaths.isEmpty ? "未選択" : viewModel.inputPaths.map { $0.path }.joined(separator: ", "))
-                        .lineLimit(3)
-                        .truncationMode(.middle)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                GroupBox(label: Text("入力")) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Button("選択…") { viewModel.chooseInputs() }
+                            Text(viewModel.inputPaths.isEmpty ? "未選択" : viewModel.inputPaths.map { $0.path }.joined(separator: ", "))
+                                .lineLimit(3)
+                                .truncationMode(.middle)
+                        }
+                        .padding(6)
+                        Text("ここに .flac ファイルやディレクトリをドラッグ＆ドロップしても追加できます")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(6)
-                Text("ここに .flac ファイルやディレクトリをドラッグ＆ドロップしても追加できます")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-            }
 
-            GroupBox(label: Text("出力")) {
-                VStack(alignment: .leading) {
-                    Toggle("入力と同じ場所に出力（.m4a）", isOn: $viewModel.inplace)
-                    HStack {
-                        Button("出力先…") { viewModel.chooseOutputDir() }
-                            .disabled(viewModel.inplace)
-                        Text((viewModel.outputDir?.path) ?? "未指定（デフォルトは ユーザーの書類フォルダ）")
-                            .foregroundColor(viewModel.inplace ? .secondary : .primary)
-                            .lineLimit(2)
-                            .truncationMode(.middle)
-                    }
-                }
-                .padding(6)
-            }
-
-            GroupBox(label: Text("アートワーク")) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Button("画像を選択…") { viewModel.chooseArtwork() }
-                        Text(viewModel.artworkURL?.lastPathComponent ?? "未選択（JPG/PNG。指定時は全てに適用）")
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    Text("ここに画像ファイルをドラッグ＆ドロップしても指定できます")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-                .padding(6)
-            }
-
-            GroupBox(label: Text("オプション")) {
-                VStack(alignment: .leading) {
-                    HStack {
-                        Toggle("既存出力を上書き", isOn: $viewModel.overwrite)
-                        Toggle("可逆性を検証（PCM MD5）", isOn: $viewModel.verify)
-                    }
-                    HStack {
-                        Toggle("アートワーク維持", isOn: $viewModel.keepArtwork)
-                        Toggle("afconvert優先(macOS)", isOn: $viewModel.preferAfconvert)
-                    }
-                    HStack {
-                        Stepper(value: $viewModel.workers, in: 1...64) {
-                            Text("並列数: \(viewModel.workers)")
+                GroupBox(label: Text("出力")) {
+                    VStack(alignment: .leading) {
+                        Toggle("入力と同じ場所に出力（.m4a）", isOn: $viewModel.inplace)
+                        HStack {
+                            Button("出力先…") { viewModel.chooseOutputDir() }
+                                .disabled(viewModel.inplace)
+                            Text((viewModel.outputDir?.path) ?? "未指定（デフォルトは ユーザーの書類フォルダ）")
+                                .foregroundColor(viewModel.inplace ? .secondary : .primary)
+                                .lineLimit(2)
+                                .truncationMode(.middle)
                         }
                     }
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(6)
-            }
 
-            HStack {
-                Button(action: { viewModel.run() }) {
-                    Text(viewModel.isRunning ? "実行中…" : "変換開始")
+                GroupBox(label: Text("アートワーク")) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Button("画像を選択…") { viewModel.chooseArtwork() }
+                            Text(viewModel.artworkURL?.lastPathComponent ?? "未選択（JPG/PNG。指定時は全てに適用）")
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        Text("ここに画像ファイルをドラッグ＆ドロップしても指定できます")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .disabled(viewModel.isRunning)
-                Spacer()
-                Text(viewModel.summary)
-                    .foregroundColor(.secondary)
-            }
 
-            List(viewModel.items) { item in
+                GroupBox(label: Text("オプション")) {
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Toggle("既存出力を上書き", isOn: $viewModel.overwrite)
+                            Toggle("可逆性を検証（PCM MD5）", isOn: $viewModel.verify)
+                        }
+                        HStack {
+                            Toggle("アートワーク維持", isOn: $viewModel.keepArtwork)
+                            Toggle("afconvert優先(macOS)", isOn: $viewModel.preferAfconvert)
+                        }
+                        HStack {
+                            Stepper(value: $viewModel.workers, in: 1...64) {
+                                Text("並列数: \(viewModel.workers)")
+                            }
+                        }
+                    }
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 HStack {
-                    Text("[\(item.status.rawValue)]")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundColor(color(for: item.status))
-                    Text(item.displayName)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    Button(action: { viewModel.run() }) {
+                        Text(viewModel.isRunning ? "実行中…" : "変換開始")
+                    }
+                    .disabled(viewModel.isRunning)
                     Spacer()
-                    Text(item.message)
+                    Text(viewModel.summary)
                         .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
                 }
-            }
-            .frame(minHeight: 240)
 
+                List(viewModel.items) { item in
+                    HStack {
+                        Text("[\(item.status.rawValue)]")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(color(for: item.status))
+                        Text(item.displayName)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Text(item.message)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+                .frame(height: 240)
+
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(12)
         .frame(minWidth: 860, minHeight: 560)
-        .onDrop(of: [UTType.fileURL, UTType.image], isTargeted: nil) { providers in
+        .onDrop(of: [UTType.fileURL], isTargeted: nil) { providers in
             handleDrop(providers: providers)
         }
     }
@@ -221,40 +230,39 @@ struct ContentView_Previews: PreviewProvider {
 }
 
 extension ContentView {
-    private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        var handled = false
-        let group = DispatchGroup()
-        for p in providers {
-            if p.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                group.enter()
-                _ = p.loadObject(ofClass: NSImage.self) { _, _ in
-                    // 画像本体からURLは取れないので、fileURLとしても試す
-                    group.leave()
+    func handleDrop(providers: [NSItemProvider]) -> Bool {
+        let fileProviders = providers.filter {
+            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+        }
+        for provider in fileProviders {
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
+                guard error == nil else { return }
+                let url: URL?
+                if let data = item as? Data {
+                    url = URL(dataRepresentation: data, relativeTo: nil)
+                } else if let value = item as? URL {
+                    url = value
+                } else if let value = item as? String {
+                    url = URL(string: value)
+                } else {
+                    url = nil
                 }
-            }
-            if p.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-                group.enter()
-                p.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (item, _) in
-                    defer { group.leave() }
-                    if let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        handled = true
-                        if url.pathExtension.lowercased() == "flac" || isDirectory(url) {
-                            DispatchQueue.main.async {
-                                if !viewModel.inputPaths.contains(url) {
-                                    viewModel.inputPaths.append(url)
-                                }
-                            }
-                        } else if ["jpg","jpeg","png"].contains(url.pathExtension.lowercased()) {
-                            DispatchQueue.main.async {
-                                viewModel.artworkURL = url
-                            }
+                guard let url = url, url.isFileURL else { return }
+                let ext = url.pathExtension.lowercased()
+                let isInput = ext == "flac" || isDirectory(url)
+                let isArtwork = ["jpg", "jpeg", "png"].contains(ext)
+                DispatchQueue.main.async {
+                    if isInput {
+                        if !viewModel.inputPaths.contains(url) {
+                            viewModel.inputPaths.append(url)
                         }
+                    } else if isArtwork {
+                        viewModel.artworkURL = url
                     }
                 }
             }
         }
-        group.wait()
-        return handled
+        return !fileProviders.isEmpty
     }
 
     private func isDirectory(_ url: URL) -> Bool {
